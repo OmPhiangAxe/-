@@ -1,12 +1,15 @@
 -- ======================================
--- 💤 4-IN-1: ลบมืด+ความเร็ว+ดินน้ำมัน+กราฟฟิกสูงสุด
+-- ⛏️ ขวานโอมเพี้ยง — 6-IN-1
+-- 💡 ลบมืด + 🎨 ดินน้ำมัน + ✨ กราฟฟิกสูงสุด
+-- 🧱 ทะลุกำแพงหน้า + 🦘 กระโดดไม่จำกัด + 🏃 ความเร็ว
 -- ======================================
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
 local plr = Players.LocalPlayer
 local PlayerGui = plr:WaitForChild("PlayerGui")
-local Character, Humanoid
+local Character, Humanoid, HumanoidRootPart
 
 -- ======================
 -- ตัวแปร
@@ -16,6 +19,8 @@ local NoDark = false
 local WalkSpeed = 16
 local OilPaintMode = false
 local MaxGraphicsMode = false
+local NoClipFront = false
+local InfiniteJump = false
 
 -- ======================
 -- 💡 โหมด 1: ลบความมืด
@@ -59,6 +64,7 @@ local function SetupCharacter(c)
     if not c then return end
     Character = c
     Humanoid = Character:WaitForChild("Humanoid")
+    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
     Humanoid.WalkSpeed = WalkSpeed
 end
 
@@ -120,33 +126,62 @@ local function SetMaxGraphics(On)
 end
 
 -- ======================
--- 🎨 สร้าง UI — ปุ่ม 💤
+-- 🧱 โหมด 5: ทะลุกำแพงด้านหน้า
+-- ======================
+task.spawn(function()
+    while task.wait(0.05) do
+        if NoClipFront and HumanoidRootPart then
+            local forward = HumanoidRootPart.CFrame.LookVector
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                HumanoidRootPart.CFrame += forward * 0.35
+                Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+                Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+            end
+            HumanoidRootPart.CanCollide = false
+        elseif HumanoidRootPart then
+            HumanoidRootPart.CanCollide = true
+        end
+    end
+end)
+
+-- ======================
+-- 🦘 โหมด 6: กระโดดไม่จำกัด
+-- ======================
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if InfiniteJump and input.KeyCode == Enum.KeyCode.Space then
+        Humanoid.Jumping = true
+    end
+end)
+
+-- ======================
+-- 🎨 สร้าง UI — ชื่อ: ขวานโอมเพี้ยง ⛏️
 -- ======================
 if PlayerGui:FindFirstChild("QuickMenu") then
     PlayerGui.QuickMenu:Destroy()
 end
 
 local UI = Instance.new("ScreenGui")
-UI.Name = "QuickMenu"
+UI.Name = "ขวานโอมเพี้ยง"
 UI.ResetOnSpawn = false
 UI.Parent = PlayerGui
 
--- 🆕 ปุ่มเปิดเมนู เปลี่ยนเป็น 💤
+-- ปุ่มเปิดเมนู 💤
 local OpenBtn = Instance.new("TextButton")
 OpenBtn.Size = UDim2.new(0, 50, 0, 50)
-OpenBtn.Position = UDim2.new(0.02, 0, 0.82, 0)
-OpenBtn.BackgroundColor3 = Color3.fromRGB(90, 110, 220)
-OpenBtn.Text = "💤"
+OpenBtn.Position = UDim2.new(0.02, 0, 0.78, 0)
+OpenBtn.BackgroundColor3 = Color3.fromRGB(139, 90, 43)
+OpenBtn.Text = "⛏️"
 OpenBtn.Font = Enum.Font.GothamBold
-OpenBtn.TextSize = 22
+OpenBtn.TextSize = 24
 OpenBtn.AutoButtonColor = false
 OpenBtn.Parent = UI
 Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(1, 0)
 
 -- กรอบเมนู
 local Menu = Instance.new("Frame")
-Menu.Size = UDim2.new(0, 185, 0, 215)
-Menu.Position = UDim2.new(0.08, 5, 0.80, 0)
+Menu.Size = UDim2.new(0, 185, 0, 278)
+Menu.Position = UDim2.new(0.08, 5, 0.76, 0)
 Menu.BackgroundColor3 = Color3.fromRGB(42, 45, 56)
 Menu.Visible = false
 Menu.Active = true
@@ -156,17 +191,17 @@ Instance.new("UICorner", Menu).CornerRadius = UDim.new(0, 12)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.BackgroundColor3 = Color3.fromRGB(90, 110, 220)
-Title.Text = "แผงควบคุม"
+Title.BackgroundColor3 = Color3.fromRGB(139, 90, 43)
+Title.Text = "⛏️ ขวานโอมเพี้ยง"
 Title.TextColor3 = Color3.new(1,1,1)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 13
 Title.Parent = Menu
 Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 12)
 
--- ปุ่มต่างๆ
+-- ปุ่ม 1: ลบความมืด
 local DarkBtn = Instance.new("TextButton")
-DarkBtn.Size = UDim2.new(0.9, 0, 0, 28)
+DarkBtn.Size = UDim2.new(0.9, 0, 0, 26)
 DarkBtn.Position = UDim2.new(0.05, 0, 0, 36)
 DarkBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
 DarkBtn.Text = "💡 ลบความมืด: ปิด"
@@ -177,9 +212,10 @@ DarkBtn.AutoButtonColor = false
 DarkBtn.Parent = Menu
 Instance.new("UICorner", DarkBtn).CornerRadius = UDim.new(0, 6)
 
+-- ปุ่ม 2: ดินน้ำมัน
 local OilBtn = Instance.new("TextButton")
-OilBtn.Size = UDim2.new(0.9, 0, 0, 28)
-OilBtn.Position = UDim2.new(0.05, 0, 0, 68)
+OilBtn.Size = UDim2.new(0.9, 0, 0, 26)
+OilBtn.Position = UDim2.new(0.05, 0, 0, 65)
 OilBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
 OilBtn.Text = "🎨 ดินน้ำมัน: ปิด"
 OilBtn.TextColor3 = Color3.new(1,1,1)
@@ -189,9 +225,10 @@ OilBtn.AutoButtonColor = false
 OilBtn.Parent = Menu
 Instance.new("UICorner", OilBtn).CornerRadius = UDim.new(0, 6)
 
+-- ปุ่ม 3: กราฟฟิกสูงสุด
 local MaxGfxBtn = Instance.new("TextButton")
-MaxGfxBtn.Size = UDim2.new(0.9, 0, 0, 28)
-MaxGfxBtn.Position = UDim2.new(0.05, 0, 0, 100)
+MaxGfxBtn.Size = UDim2.new(0.9, 0, 0, 26)
+MaxGfxBtn.Position = UDim2.new(0.05, 0, 0, 94)
 MaxGfxBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
 MaxGfxBtn.Text = "✨ กราฟฟิกสูงสุด: ปิด"
 MaxGfxBtn.TextColor3 = Color3.new(1,1,1)
@@ -201,9 +238,36 @@ MaxGfxBtn.AutoButtonColor = false
 MaxGfxBtn.Parent = Menu
 Instance.new("UICorner", MaxGfxBtn).CornerRadius = UDim.new(0, 6)
 
+-- ปุ่ม 4: ทะลุกำแพงด้านหน้า
+local NoClipBtn = Instance.new("TextButton")
+NoClipBtn.Size = UDim2.new(0.9, 0, 0, 26)
+NoClipBtn.Position = UDim2.new(0.05, 0, 0, 123)
+NoClipBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+NoClipBtn.Text = "🧱 ทะลุกำแพงหน้า: ปิด"
+NoClipBtn.TextColor3 = Color3.new(1,1,1)
+NoClipBtn.Font = Enum.Font.Gotham
+NoClipBtn.TextSize = 11
+NoClipBtn.AutoButtonColor = false
+NoClipBtn.Parent = Menu
+Instance.new("UICorner", NoClipBtn).CornerRadius = UDim.new(0, 6)
+
+-- ปุ่ม 5: กระโดดไม่จำกัด
+local JumpBtn = Instance.new("TextButton")
+JumpBtn.Size = UDim2.new(0.9, 0, 0, 26)
+JumpBtn.Position = UDim2.new(0.05, 0, 0, 152)
+JumpBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+JumpBtn.Text = "🦘 กระโดดไม่จำกัด: ปิด"
+JumpBtn.TextColor3 = Color3.new(1,1,1)
+JumpBtn.Font = Enum.Font.Gotham
+JumpBtn.TextSize = 11
+JumpBtn.AutoButtonColor = false
+JumpBtn.Parent = Menu
+Instance.new("UICorner", JumpBtn).CornerRadius = UDim.new(0, 6)
+
+-- ความเร็ว
 local SpeedText = Instance.new("TextLabel")
-SpeedText.Size = UDim2.new(0.9, 0, 0, 20)
-SpeedText.Position = UDim2.new(0.05, 0, 0, 132)
+SpeedText.Size = UDim2.new(0.9, 0, 0, 18)
+SpeedText.Position = UDim2.new(0.05, 0, 0, 181)
 SpeedText.BackgroundTransparency = 1
 SpeedText.Text = "🏃 ความเร็ว: " .. WalkSpeed .. "/100"
 SpeedText.TextColor3 = Color3.new(1,1,1)
@@ -212,8 +276,8 @@ SpeedText.TextSize = 11
 SpeedText.Parent = Menu
 
 local SpeedMinus = Instance.new("TextButton")
-SpeedMinus.Size = UDim2.new(0.25, 0, 0, 26)
-SpeedMinus.Position = UDim2.new(0.05, 0, 0, 155)
+SpeedMinus.Size = UDim2.new(0.25, 0, 0, 24)
+SpeedMinus.Position = UDim2.new(0.05, 0, 0, 204)
 SpeedMinus.BackgroundColor3 = Color3.fromRGB(80, 60, 100)
 SpeedMinus.Text = "−"
 SpeedMinus.TextColor3 = Color3.new(1,1,1)
@@ -224,8 +288,8 @@ SpeedMinus.Parent = Menu
 Instance.new("UICorner", SpeedMinus).CornerRadius = UDim.new(0, 6)
 
 local SpeedPlus = Instance.new("TextButton")
-SpeedPlus.Size = UDim2.new(0.25, 0, 0, 26)
-SpeedPlus.Position = UDim2.new(0.70, 0, 0, 155)
+SpeedPlus.Size = UDim2.new(0.25, 0, 0, 24)
+SpeedPlus.Position = UDim2.new(0.70, 0, 0, 204)
 SpeedPlus.BackgroundColor3 = Color3.fromRGB(40, 130, 90)
 SpeedPlus.Text = "+"
 SpeedPlus.TextColor3 = Color3.new(1,1,1)
@@ -236,8 +300,8 @@ SpeedPlus.Parent = Menu
 Instance.new("UICorner", SpeedPlus).CornerRadius = UDim.new(0, 6)
 
 local ResetBtn = Instance.new("TextButton")
-ResetBtn.Size = UDim2.new(0.4, 0, 0, 26)
-ResetBtn.Position = UDim2.new(0.3, 0, 0, 155)
+ResetBtn.Size = UDim2.new(0.4, 0, 0, 24)
+ResetBtn.Position = UDim2.new(0.3, 0, 0, 204)
 ResetBtn.BackgroundColor3 = Color3.fromRGB(100, 70, 40)
 ResetBtn.Text = "รีเซ็ต"
 ResetBtn.TextColor3 = Color3.new(1,1,1)
@@ -253,7 +317,7 @@ Instance.new("UICorner", ResetBtn).CornerRadius = UDim.new(0, 6)
 OpenBtn.MouseButton1Click:Connect(function()
     MenuOpen = not MenuOpen
     Menu.Visible = MenuOpen
-    OpenBtn.BackgroundColor3 = MenuOpen and Color3.fromRGB(70, 180, 120) or Color3.fromRGB(90, 110, 220)
+    OpenBtn.BackgroundColor3 = MenuOpen and Color3.fromRGB(70, 180, 120) or Color3.fromRGB(139, 90, 43)
 end)
 
 DarkBtn.MouseButton1Click:Connect(function()
@@ -277,6 +341,18 @@ MaxGfxBtn.MouseButton1Click:Connect(function()
     MaxGfxBtn.BackgroundColor3 = MaxGraphicsMode and Color3.fromRGB(35, 160, 90) or Color3.fromRGB(65, 80, 100)
 end)
 
+NoClipBtn.MouseButton1Click:Connect(function()
+    NoClipFront = not NoClipFront
+    NoClipBtn.Text = NoClipFront and "🧱 ทะลุกำแพงหน้า: เปิด" or "🧱 ทะลุกำแพงหน้า: ปิด"
+    NoClipBtn.BackgroundColor3 = NoClipFront and Color3.fromRGB(35, 160, 90) or Color3.fromRGB(65, 80, 100)
+end)
+
+JumpBtn.MouseButton1Click:Connect(function()
+    InfiniteJump = not InfiniteJump
+    JumpBtn.Text = InfiniteJump and "🦘 กระโดดไม่จำกัด: เปิด" or "🦘 กระโดดไม่จำกัด: ปิด"
+    JumpBtn.BackgroundColor3 = InfiniteJump and Color3.fromRGB(35, 160, 90) or Color3.fromRGB(65, 80, 100)
+end)
+
 SpeedPlus.MouseButton1Click:Connect(function()
     WalkSpeed = math.min(WalkSpeed + 5, 100)
     SpeedText.Text = "🏃 ความเร็ว: " .. WalkSpeed .. "/100"
@@ -294,6 +370,8 @@ ResetBtn.MouseButton1Click:Connect(function()
     NoDark = false
     OilPaintMode = false
     MaxGraphicsMode = false
+    NoClipFront = false
+    InfiniteJump = false
     SpeedText.Text = "🏃 ความเร็ว: " .. WalkSpeed .. "/100"
     DarkBtn.Text = "💡 ลบความมืด: ปิด"
     DarkBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
@@ -301,10 +379,15 @@ ResetBtn.MouseButton1Click:Connect(function()
     OilBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
     MaxGfxBtn.Text = "✨ กราฟฟิกสูงสุด: ปิด"
     MaxGfxBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+    NoClipBtn.Text = "🧱 ทะลุกำแพงหน้า: ปิด"
+    NoClipBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+    JumpBtn.Text = "🦘 กระโดดไม่จำกัด: ปิด"
+    JumpBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
     SetDarkness(false)
     SetOilPaint(false)
     SetMaxGraphics(false)
     UpdateSpeed()
 end)
 
-print("[✅] พร้อมใช้งาน! กดปุ่ม 💤 ที่มุมจอ")
+print("[⛏️] ขวานโอมเพี้ยง — พร้อมใช้งาน! กด ⛏️ ที่มุมจอ")
+print("[✨] 6 โหมดครบถ้วน! โอมเพี้ยงงง! ⛏️💥")
