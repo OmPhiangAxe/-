@@ -1,0 +1,310 @@
+-- ======================================
+-- 💤 4-IN-1: ลบมืด+ความเร็ว+ดินน้ำมัน+กราฟฟิกสูงสุด
+-- ======================================
+
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local plr = Players.LocalPlayer
+local PlayerGui = plr:WaitForChild("PlayerGui")
+local Character, Humanoid
+
+-- ======================
+-- ตัวแปร
+-- ======================
+local MenuOpen = false
+local NoDark = false
+local WalkSpeed = 16
+local OilPaintMode = false
+local MaxGraphicsMode = false
+
+-- ======================
+-- 💡 โหมด 1: ลบความมืด
+-- ======================
+local function SetDarkness(On)
+    if On then
+        Lighting.Brightness = 3
+        Lighting.GlobalShadows = false
+        Lighting.Ambient = Color3.fromRGB(200, 200, 200)
+        Lighting.OutdoorAmbient = Color3.fromRGB(200, 200, 200)
+        Lighting.FogEnd = 100000
+        Lighting.FogStart = 0
+        Lighting.ColorShiftTop = Color3.fromRGB(255, 255, 255)
+        Lighting.ColorShiftBottom = Color3.fromRGB(255, 255, 255)
+    else
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = true
+        Lighting.Ambient = Color3.fromRGB(140, 140, 140)
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.FogEnd = 10000
+    end
+end
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if NoDark then
+            Lighting.Brightness = math.max(Lighting.Brightness, 2.5)
+            Lighting.GlobalShadows = false
+        end
+    end
+end)
+
+-- ======================
+-- 🏃 โหมด 2: ปรับความเร็ว
+-- ======================
+local function UpdateSpeed()
+    if Humanoid then Humanoid.WalkSpeed = WalkSpeed end
+end
+
+local function SetupCharacter(c)
+    if not c then return end
+    Character = c
+    Humanoid = Character:WaitForChild("Humanoid")
+    Humanoid.WalkSpeed = WalkSpeed
+end
+
+SetupCharacter(plr.Character or plr.CharacterAdded:Wait())
+plr.CharacterAdded:Connect(SetupCharacter)
+
+-- ======================
+-- 🎨 โหมด 3: ดินน้ำมัน
+-- ======================
+local function SetOilPaint(On)
+    if On then
+        Lighting.Brightness = 2.2
+        Lighting.GlobalShadows = true
+        Lighting.ShadowSoftness = 0.5
+        Lighting.Ambient = Color3.fromRGB(180, 160, 140)
+        Lighting.OutdoorAmbient = Color3.fromRGB(200, 180, 160)
+        Lighting.FogEnd = 8000
+        Lighting.FogColor = Color3.fromRGB(210, 190, 170)
+        Lighting.ColorShiftTop = Color3.fromRGB(255, 245, 230)
+        Lighting.ColorShiftBottom = Color3.fromRGB(230, 210, 190)
+    else
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = true
+        Lighting.ShadowSoftness = 0.2
+        Lighting.Ambient = Color3.fromRGB(140, 140, 140)
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.FogEnd = 100000
+        Lighting.FogColor = Color3.fromRGB(200, 220, 255)
+        Lighting.ColorShiftTop = Color3.fromRGB(255, 255, 255)
+        Lighting.ColorShiftBottom = Color3.fromRGB(255, 255, 255)
+    end
+end
+
+-- ======================
+-- ✨ โหมด 4: กราฟฟิกสูงสุด
+-- ======================
+local function SetMaxGraphics(On)
+    if On then
+        Lighting.Brightness = 2.5
+        Lighting.GlobalShadows = true
+        Lighting.ShadowSoftness = 0.3
+        Lighting.Ambient = Color3.fromRGB(150, 160, 180)
+        Lighting.OutdoorAmbient = Color3.fromRGB(180, 190, 210)
+        Lighting.FogEnd = 150000
+        Lighting.FogColor = Color3.fromRGB(200, 220, 255)
+        Lighting.ColorShiftTop = Color3.fromRGB(240, 245, 255)
+        Lighting.ColorShiftBottom = Color3.fromRGB(220, 230, 245)
+    else
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = true
+        Lighting.ShadowSoftness = 0.2
+        Lighting.Ambient = Color3.fromRGB(140, 140, 140)
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.FogEnd = 100000
+        Lighting.FogColor = Color3.fromRGB(200, 220, 255)
+        Lighting.ColorShiftTop = Color3.fromRGB(255, 255, 255)
+        Lighting.ColorShiftBottom = Color3.fromRGB(255, 255, 255)
+    end
+end
+
+-- ======================
+-- 🎨 สร้าง UI — ปุ่ม 💤
+-- ======================
+if PlayerGui:FindFirstChild("QuickMenu") then
+    PlayerGui.QuickMenu:Destroy()
+end
+
+local UI = Instance.new("ScreenGui")
+UI.Name = "QuickMenu"
+UI.ResetOnSpawn = false
+UI.Parent = PlayerGui
+
+-- 🆕 ปุ่มเปิดเมนู เปลี่ยนเป็น 💤
+local OpenBtn = Instance.new("TextButton")
+OpenBtn.Size = UDim2.new(0, 50, 0, 50)
+OpenBtn.Position = UDim2.new(0.02, 0, 0.82, 0)
+OpenBtn.BackgroundColor3 = Color3.fromRGB(90, 110, 220)
+OpenBtn.Text = "💤"
+OpenBtn.Font = Enum.Font.GothamBold
+OpenBtn.TextSize = 22
+OpenBtn.AutoButtonColor = false
+OpenBtn.Parent = UI
+Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(1, 0)
+
+-- กรอบเมนู
+local Menu = Instance.new("Frame")
+Menu.Size = UDim2.new(0, 185, 0, 215)
+Menu.Position = UDim2.new(0.08, 5, 0.80, 0)
+Menu.BackgroundColor3 = Color3.fromRGB(42, 45, 56)
+Menu.Visible = false
+Menu.Active = true
+Menu.Draggable = true
+Menu.Parent = UI
+Instance.new("UICorner", Menu).CornerRadius = UDim.new(0, 12)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(90, 110, 220)
+Title.Text = "แผงควบคุม"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 13
+Title.Parent = Menu
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 12)
+
+-- ปุ่มต่างๆ
+local DarkBtn = Instance.new("TextButton")
+DarkBtn.Size = UDim2.new(0.9, 0, 0, 28)
+DarkBtn.Position = UDim2.new(0.05, 0, 0, 36)
+DarkBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+DarkBtn.Text = "💡 ลบความมืด: ปิด"
+DarkBtn.TextColor3 = Color3.new(1,1,1)
+DarkBtn.Font = Enum.Font.Gotham
+DarkBtn.TextSize = 11
+DarkBtn.AutoButtonColor = false
+DarkBtn.Parent = Menu
+Instance.new("UICorner", DarkBtn).CornerRadius = UDim.new(0, 6)
+
+local OilBtn = Instance.new("TextButton")
+OilBtn.Size = UDim2.new(0.9, 0, 0, 28)
+OilBtn.Position = UDim2.new(0.05, 0, 0, 68)
+OilBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+OilBtn.Text = "🎨 ดินน้ำมัน: ปิด"
+OilBtn.TextColor3 = Color3.new(1,1,1)
+OilBtn.Font = Enum.Font.Gotham
+OilBtn.TextSize = 11
+OilBtn.AutoButtonColor = false
+OilBtn.Parent = Menu
+Instance.new("UICorner", OilBtn).CornerRadius = UDim.new(0, 6)
+
+local MaxGfxBtn = Instance.new("TextButton")
+MaxGfxBtn.Size = UDim2.new(0.9, 0, 0, 28)
+MaxGfxBtn.Position = UDim2.new(0.05, 0, 0, 100)
+MaxGfxBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+MaxGfxBtn.Text = "✨ กราฟฟิกสูงสุด: ปิด"
+MaxGfxBtn.TextColor3 = Color3.new(1,1,1)
+MaxGfxBtn.Font = Enum.Font.Gotham
+MaxGfxBtn.TextSize = 11
+MaxGfxBtn.AutoButtonColor = false
+MaxGfxBtn.Parent = Menu
+Instance.new("UICorner", MaxGfxBtn).CornerRadius = UDim.new(0, 6)
+
+local SpeedText = Instance.new("TextLabel")
+SpeedText.Size = UDim2.new(0.9, 0, 0, 20)
+SpeedText.Position = UDim2.new(0.05, 0, 0, 132)
+SpeedText.BackgroundTransparency = 1
+SpeedText.Text = "🏃 ความเร็ว: " .. WalkSpeed .. "/100"
+SpeedText.TextColor3 = Color3.new(1,1,1)
+SpeedText.Font = Enum.Font.Gotham
+SpeedText.TextSize = 11
+SpeedText.Parent = Menu
+
+local SpeedMinus = Instance.new("TextButton")
+SpeedMinus.Size = UDim2.new(0.25, 0, 0, 26)
+SpeedMinus.Position = UDim2.new(0.05, 0, 0, 155)
+SpeedMinus.BackgroundColor3 = Color3.fromRGB(80, 60, 100)
+SpeedMinus.Text = "−"
+SpeedMinus.TextColor3 = Color3.new(1,1,1)
+SpeedMinus.Font = Enum.Font.GothamBold
+SpeedMinus.TextSize = 14
+SpeedMinus.AutoButtonColor = false
+SpeedMinus.Parent = Menu
+Instance.new("UICorner", SpeedMinus).CornerRadius = UDim.new(0, 6)
+
+local SpeedPlus = Instance.new("TextButton")
+SpeedPlus.Size = UDim2.new(0.25, 0, 0, 26)
+SpeedPlus.Position = UDim2.new(0.70, 0, 0, 155)
+SpeedPlus.BackgroundColor3 = Color3.fromRGB(40, 130, 90)
+SpeedPlus.Text = "+"
+SpeedPlus.TextColor3 = Color3.new(1,1,1)
+SpeedPlus.Font = Enum.Font.GothamBold
+SpeedPlus.TextSize = 14
+SpeedPlus.AutoButtonColor = false
+SpeedPlus.Parent = Menu
+Instance.new("UICorner", SpeedPlus).CornerRadius = UDim.new(0, 6)
+
+local ResetBtn = Instance.new("TextButton")
+ResetBtn.Size = UDim2.new(0.4, 0, 0, 26)
+ResetBtn.Position = UDim2.new(0.3, 0, 0, 155)
+ResetBtn.BackgroundColor3 = Color3.fromRGB(100, 70, 40)
+ResetBtn.Text = "รีเซ็ต"
+ResetBtn.TextColor3 = Color3.new(1,1,1)
+ResetBtn.Font = Enum.Font.Gotham
+ResetBtn.TextSize = 10
+ResetBtn.AutoButtonColor = false
+ResetBtn.Parent = Menu
+Instance.new("UICorner", ResetBtn).CornerRadius = UDim.new(0, 6)
+
+-- ======================
+-- 🔄 กดทำงาน
+-- ======================
+OpenBtn.MouseButton1Click:Connect(function()
+    MenuOpen = not MenuOpen
+    Menu.Visible = MenuOpen
+    OpenBtn.BackgroundColor3 = MenuOpen and Color3.fromRGB(70, 180, 120) or Color3.fromRGB(90, 110, 220)
+end)
+
+DarkBtn.MouseButton1Click:Connect(function()
+    NoDark = not NoDark
+    SetDarkness(NoDark)
+    DarkBtn.Text = NoDark and "💡 ลบความมืด: เปิด" or "💡 ลบความมืด: ปิด"
+    DarkBtn.BackgroundColor3 = NoDark and Color3.fromRGB(35, 160, 90) or Color3.fromRGB(65, 80, 100)
+end)
+
+OilBtn.MouseButton1Click:Connect(function()
+    OilPaintMode = not OilPaintMode
+    SetOilPaint(OilPaintMode)
+    OilBtn.Text = OilPaintMode and "🎨 ดินน้ำมัน: เปิด" or "🎨 ดินน้ำมัน: ปิด"
+    OilBtn.BackgroundColor3 = OilPaintMode and Color3.fromRGB(35, 160, 90) or Color3.fromRGB(65, 80, 100)
+end)
+
+MaxGfxBtn.MouseButton1Click:Connect(function()
+    MaxGraphicsMode = not MaxGraphicsMode
+    SetMaxGraphics(MaxGraphicsMode)
+    MaxGfxBtn.Text = MaxGraphicsMode and "✨ กราฟฟิกสูงสุด: เปิด" or "✨ กราฟฟิกสูงสุด: ปิด"
+    MaxGfxBtn.BackgroundColor3 = MaxGraphicsMode and Color3.fromRGB(35, 160, 90) or Color3.fromRGB(65, 80, 100)
+end)
+
+SpeedPlus.MouseButton1Click:Connect(function()
+    WalkSpeed = math.min(WalkSpeed + 5, 100)
+    SpeedText.Text = "🏃 ความเร็ว: " .. WalkSpeed .. "/100"
+    UpdateSpeed()
+end)
+
+SpeedMinus.MouseButton1Click:Connect(function()
+    WalkSpeed = math.max(WalkSpeed - 5, 1)
+    SpeedText.Text = "🏃 ความเร็ว: " .. WalkSpeed .. "/100"
+    UpdateSpeed()
+end)
+
+ResetBtn.MouseButton1Click:Connect(function()
+    WalkSpeed = 16
+    NoDark = false
+    OilPaintMode = false
+    MaxGraphicsMode = false
+    SpeedText.Text = "🏃 ความเร็ว: " .. WalkSpeed .. "/100"
+    DarkBtn.Text = "💡 ลบความมืด: ปิด"
+    DarkBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+    OilBtn.Text = "🎨 ดินน้ำมัน: ปิด"
+    OilBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+    MaxGfxBtn.Text = "✨ กราฟฟิกสูงสุด: ปิด"
+    MaxGfxBtn.BackgroundColor3 = Color3.fromRGB(65, 80, 100)
+    SetDarkness(false)
+    SetOilPaint(false)
+    SetMaxGraphics(false)
+    UpdateSpeed()
+end)
+
+print("[✅] พร้อมใช้งาน! กดปุ่ม 💤 ที่มุมจอ")
