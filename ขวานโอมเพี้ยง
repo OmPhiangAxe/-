@@ -1,405 +1,226 @@
--- ======================================
--- ⛏️ ขวานโอมเพี้ยง — 🌈 ขอบสีรุ้งหมุนเวียน
--- ======================================
-
+-- เมนูมือถือ v2.0 | แก้ปัญหาเมนูไม่ขึ้น
 local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local plr = Players.LocalPlayer
 local pg = plr:WaitForChild("PlayerGui")
 
--- ========== ตัวแปร ==========
-local NoDark = false
-local MaxGfx = false
-local InfiniteJump = false
-local GodMode = false
-local NoClipFront = false
-local AntiKick = false
-local OilPaint = false
-local WalkSpeed = 16
+-- ลบเมนูเก่าก่อน
+if pg:FindFirstChild("GameMenu") then pg.GameMenu:Destroy() end
 
-local Humanoid = nil
-local HRP = nil
-local FF = nil
-local LastJump = 0
-local MyEffects = {}
-local OriginalNameCall, OriginalKick, OriginalMessage
-
--- บันทึกค่าแสงเดิม
-local Orig = {
-    Brightness = Lighting.Brightness,
-    ClockTime = Lighting.ClockTime,
-    GlobalShadows = Lighting.GlobalShadows,
-    ShadowSoftness = Lighting.ShadowSoftness,
-    Ambient = Lighting.Ambient,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-    FogEnd = Lighting.FogEnd,
-    FogStart = Lighting.FogStart,
-    FogColor = Lighting.FogColor,
-    ExposureCompensation = Lighting.ExposureCompensation,
-    Specular = Lighting.EnvironmentSpecularScale,
-    Diffuse = Lighting.EnvironmentDiffuseScale,
+-- ===== ตัวแปรสถานะ =====
+local Settings = {
+    NoDark = false, Fly = false, NoClip = false,
+    God = false, NoDeath = false, OneHit = false,
+    Nuke = false, ItemFind = false, LowGraph = false
 }
+local Values = {Damage=100, NukeRange=15, WalkSpeed=16, FlySpeed=35}
+local Refs = {BodyVel=nil, Humanoid=nil, HRP=nil, Char=nil, ItemMarkers={}}
+local Orig = {Lighting={}, Render={}}
 
--- ========== สีรุ้ง ==========
-local RainbowColors = {
-    Color3.fromRGB(255, 0, 0),    -- 🔴 แดง
-    Color3.fromRGB(255, 165, 0),  -- 🟠 ส้ม
-    Color3.fromRGB(255, 255, 0),  -- 🟡 เหลือง
-    Color3.fromRGB(0, 255, 0),    -- 🟢 เขียว
-    Color3.fromRGB(0, 255, 255),  -- 🔵 ฟ้า
-    Color3.fromRGB(0, 0, 255),    -- 🟦 น้ำเงิน
-    Color3.fromRGB(138, 43, 226), -- 🟪 ม่วง
+-- ===== บันทึกค่าเดิม =====
+Orig.Lighting = {
+    Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime,
+    GlobalShadows = Lighting.GlobalShadows, Fog = Lighting.Fog,
+    FogDensity = Lighting.FogDensity
 }
+Orig.Render = {Quality=settings():GetService("RenderSettings").QualityLevel}
 
--- สร้าง UICorner สีรุ้งหมุน
-local function AddRainbowBorder(parent, thickness)
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = parent
-
-    local border = Instance.new("UIStroke")
-    border.Thickness = thickness
-    border.LineJoinMode = Enum.LineJoinMode.Round
-    border.Transparency = 0
-    border.Parent = parent
-
-    -- วนสีรุ้งไปเรื่อยๆ
-    task.spawn(function()
-        local index = 1
-        while parent:IsDescendantOf(game) do
-            local nextIndex = index % #RainbowColors + 1
-            TweenService:Create(border, TweenInfo.new(0.8, Enum.EasingStyle.Linear), {Color = RainbowColors[nextIndex]}):Play()
-            index = nextIndex
-            task.wait(0.8)
-        end
-    end)
-
-    return corner, border
+-- ===== ฟังก์ชันพื้นฐาน =====
+local function SetupChar(c)
+    if not c then return end
+    Refs.Char = c
+    Refs.Humanoid = c:WaitForChild("Humanoid")
+    Refs.HRP = c:WaitForChild("HumanoidRootPart")
+    Refs.Humanoid.WalkSpeed = Values.WalkSpeed
+    Refs.Humanoid.GravityScale = 1
 end
+SetupChar(plr.Character)
+plr.CharacterAdded:Connect(SetupChar)
 
--- ========== โหลดตัวละคร ==========
-local function loadChar(c)
-    Humanoid = c:WaitForChild("Humanoid")
-    HRP = c:WaitForChild("HumanoidRootPart")
-    Humanoid.WalkSpeed = WalkSpeed
-end
-loadChar(plr.Character or plr.CharacterAdded:Wait())
-plr.CharacterAdded:Connect(loadChar)
-
--- ========== คืนค่าแสงเดิม ==========
-local function restoreLight()
-    Lighting.Brightness = Orig.Brightness
-    Lighting.ClockTime = Orig.ClockTime
-    Lighting.GlobalShadows = Orig.GlobalShadows
-    Lighting.ShadowSoftness = Orig.ShadowSoftness
-    Lighting.Ambient = Orig.Ambient
-    Lighting.OutdoorAmbient = Orig.OutdoorAmbient
-    Lighting.FogEnd = Orig.FogEnd
-    Lighting.FogStart = Orig.FogStart
-    Lighting.FogColor = Orig.FogColor
-    Lighting.ExposureCompensation = Orig.ExposureCompensation
-    Lighting.EnvironmentSpecularScale = Orig.Specular
-    Lighting.EnvironmentDiffuseScale = Orig.Diffuse
-    for _,e in pairs(MyEffects) do pcall(function() e:Destroy() end) end
-    MyEffects = {}
-end
-
--- ========== ลบสีแดง/เอฟเฟกต์ ==========
-local function clearRedEffects()
-    for _,e in pairs(Lighting:GetChildren()) do
-        if e:IsA("PostEffect") or e:IsA("Atmosphere") then
-            pcall(function() e:Destroy() end)
-        end
-    end
-    local cam = workspace.CurrentCamera
-    if cam then
-        for _,e in pairs(cam:GetChildren()) do
-            if e:IsA("PostEffect") or e:IsA("Atmosphere") then
-                pcall(function() e:Destroy() end)
-            end
-        end
-    end
-end
-
--- ========== 1. ลบมืด ==========
-local function setDark(on)
+-- ===== ฟีเจอร์ต่างๆ =====
+local function SetNoDark(on)
+    Settings.NoDark = on
     if on then
-        clearRedEffects()
-        Lighting.Brightness = 10
+        Lighting.Brightness = 2
         Lighting.ClockTime = 12
         Lighting.GlobalShadows = false
-        Lighting.Ambient = Color3.fromRGB(255,255,255)
-        Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
-        Lighting.FogEnd = 1000000
-        Lighting.FogColor = Color3.fromRGB(255,255,255)
-        Lighting.ExposureCompensation = 2
+        Lighting.Ambient = Color3.fromRGB(200,200,200)
+        Lighting.OutdoorAmbient = Color3.fromRGB(200,200,200)
     else
-        restoreLight()
+        Lighting.Brightness = Orig.Lighting.Brightness
+        Lighting.ClockTime = Orig.Lighting.ClockTime
+        Lighting.GlobalShadows = Orig.Lighting.GlobalShadows
     end
 end
 
--- ========== 2. กราฟฟิกสูงสุด ลบสีแดง ==========
-local function setMaxGfx(on)
+local function SetFly(on)
+    Settings.Fly = on
+    if not Refs.Humanoid or not Refs.HRP then return end
     if on then
-        clearRedEffects()
-        Lighting.Brightness = 3
-        Lighting.ClockTime = 14.5
-        Lighting.GlobalShadows = true
-        Lighting.ShadowSoftness = 0.2
-        Lighting.Ambient = Color3.fromRGB(170,180,200)
-        Lighting.OutdoorAmbient = Color3.fromRGB(200,210,230)
-        Lighting.FogEnd = 1000000
-        Lighting.FogColor = Color3.fromRGB(220,230,255)
-        Lighting.ColorShiftTop = Color3.fromRGB(255,255,255)
-        Lighting.ColorShiftBottom = Color3.fromRGB(255,255,255)
-        Lighting.ExposureCompensation = 2
-        Lighting.EnvironmentSpecularScale = 1
-        Lighting.EnvironmentDiffuseScale = 1
-        for _,v in pairs(workspace:GetDescendants()) do
-            if v:IsA("BasePart") then v.CastShadow = true end
-        end
-        local bloom = Instance.new("BloomEffect")
-        bloom.Intensity = 10; bloom.Size = 100; bloom.Threshold = 0.8
-        bloom.Parent = Lighting; table.insert(MyEffects, bloom)
-        local sun = Instance.new("SunRaysEffect")
-        sun.Intensity = 1; sun.Spread = 1
-        sun.Parent = Lighting; table.insert(MyEffects, sun)
-        local cc = Instance.new("ColorCorrectionEffect")
-        cc.Brightness = 0.1; cc.Contrast = 1; cc.Saturation = 1
-        cc.TintColor = Color3.fromRGB(255,255,255)
-        cc.Parent = Lighting; table.insert(MyEffects, cc)
-        local atm = Instance.new("Atmosphere")
-        atm.Density = 0.3; atm.Offset = 0.25
-        atm.Color = Color3.fromRGB(199,215,240)
-        atm.Decay = Color3.fromRGB(110,140,180)
-        atm.Glare = 1; atm.Haze = 10
-        atm.Parent = Lighting; table.insert(MyEffects, atm)
-    else
-        restoreLight()
-    end
-end
-
--- ========== 6. ป้องกันโดนเตะออก ==========
-local function setAntiKick(on)
-    if on then
-        pcall(function()
-            if not OriginalKick then OriginalKick = plr.Kick end
-            plr.Kick = function() end
-        end)
-        pcall(function()
-            if not OriginalMessage then OriginalMessage = plr.Message end
-            plr.Message = function() end
-        end)
-        print("[🛡️] เปิดป้องกันเตะออก")
-    else
-        pcall(function()
-            if OriginalKick then plr.Kick = OriginalKick end
-            if OriginalMessage then plr.Message = OriginalMessage end
-        end)
-        print("[🛡️] ปิดป้องกันเตะออก")
-    end
-end
-
--- ========== 7. ดินน้ำมัน/ลื่นขึ้น ==========
-local function setOilPaint(on)
-    if on then
-        clearRedEffects()
-        Lighting.Brightness = 2.5
-        Lighting.ClockTime = 16
-        Lighting.ShadowSoftness = 0.8
-        Lighting.Ambient = Color3.fromRGB(200,160,120)
-        Lighting.OutdoorAmbient = Color3.fromRGB(220,180,140)
-        Lighting.FogEnd = 5000
-        Lighting.FogColor = Color3.fromRGB(230,190,150)
-        Lighting.ColorShiftTop = Color3.fromRGB(255,235,200)
-        Lighting.ColorShiftBottom = Color3.fromRGB(200,160,120)
-        Lighting.EnvironmentSpecularScale = 0.2
-        Lighting.ExposureCompensation = 0.3
-        local blur = Instance.new("BlurEffect")
-        blur.Size = 4
-        blur.Parent = Lighting
-        table.insert(MyEffects, blur)
-        local cc = Instance.new("ColorCorrectionEffect")
-        cc.Brightness = 0.05
-        cc.Contrast = -0.15
-        cc.Saturation = 0.4
-        cc.TintColor = Color3.fromRGB(255,230,190)
-        cc.Parent = Lighting
-        table.insert(MyEffects, cc)
-        if Humanoid then Humanoid.BreakJointsOnDeath = false end
-        print("[🎨] เปิดโหมดดินน้ำมัน ลื่นขึ้น!")
-    else
-        restoreLight()
-        print("[🎨] ปิดโหมดดินน้ำมัน")
-    end
-end
-
--- ========== 3. กระโดดไม่จำกัด ==========
-local function doJump()
-    if not InfiniteJump or not Humanoid or not HRP then return end
-    local now = tick()
-    if now - LastJump < 0.15 then return end
-    LastJump = now
-    Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-    wait(0.05)
-    if HRP then
-        local v = HRP.Velocity
-        HRP.Velocity = Vector3.new(v.X, 55, v.Z)
-    end
-end
-UserInputService.JumpRequest:Connect(doJump)
-
--- ========== 4. อมตะ ==========
-local function setGod(on)
-    if on then
-        if Humanoid then
-            Humanoid.MaxHealth = math.huge
-            Humanoid.Health = math.huge
-        end
-        if FF then pcall(function() FF:Destroy() end) end
-        FF = Instance.new("ForceField")
-        FF.Parent = plr.Character
-    else
-        if FF then pcall(function() FF:Destroy() end); FF = nil end
-        if Humanoid then
-            Humanoid.MaxHealth = 100
-            Humanoid.Health = 100
-        end
-    end
-end
-task.spawn(function()
-    while task.wait(0.3) do
-        if GodMode and Humanoid then
-            Humanoid.Health = math.huge
-            Humanoid.MaxHealth = math.huge
-            if not FF or not FF.Parent then
-                FF = Instance.new("ForceField")
-                FF.Parent = plr.Character
+        Refs.Humanoid.GravityScale = 0
+        Refs.Humanoid.JumpPower = 0
+        task.spawn(function()
+            while Settings.Fly and Refs.HRP do
+                local camCF = workspace.CurrentCamera.CFrame
+                local move = Vector3.new()
+                if UIS:IsKeyDown(Enum.KeyCode.W) then move += camCF.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then move -= camCF.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then move -= camCF.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then move += camCF.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+                Refs.HRP.Velocity = move.Unit * Values.FlySpeed
+                task.wait(0.05)
             end
-        end
+        end)
+    else
+        Refs.Humanoid.GravityScale = 1
     end
-end)
-
--- ========== 5. ทะลุกำแพง ==========
-RunService.RenderStepped:Connect(function()
-    if NoClipFront and HRP then
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            HRP.CFrame = HRP.CFrame + HRP.CFrame.LookVector * 0.4
-        end
-        for _,p in pairs(plr.Character:GetChildren()) do
-            if p:IsA("BasePart") then p.CanCollide = false end
-        end
-    elseif plr.Character then
-        for _,p in pairs(plr.Character:GetChildren()) do
-            if p:IsA("BasePart") then p.CanCollide = true end
-        end
-    end
-end)
-
--- ========== UI ==========
-pcall(function() if pg:FindFirstChild("OmPhiangAxe") then pg.OmPhiangAxe:Destroy() end end)
-
-local sg = Instance.new("ScreenGui")
-sg.Name = "OmPhiangAxe"; sg.ResetOnSpawn = false; sg.Parent = pg
-
--- ปุ่มเปิดเมนู
-local openBtn = Instance.new("TextButton")
-openBtn.Size = UDim2.new(0,55,0,55); openBtn.Position = UDim2.new(0.02,0,0.68,0)
-openBtn.BackgroundColor3 = Color3.fromRGB(45,45,55); openBtn.Text = "⛏️"
-openBtn.TextSize = 28; openBtn.TextColor3 = Color3.new(1,1,1); openBtn.AutoButtonColor = false; openBtn.Parent = sg
-AddRainbowBorder(openBtn, 3)  -- 🌈 ขอบสีรุ้งหมุน
-
--- กล่องเมนู
-local menu = Instance.new("Frame")
-menu.Size = UDim2.new(0,180,0,390); menu.Position = UDim2.new(0.1,0,0.5,-195)
-menu.BackgroundColor3 = Color3.fromRGB(30,32,40); menu.Visible = false
-menu.Active = true; menu.Draggable = true; menu.Parent = sg
-AddRainbowBorder(menu, 2)  -- 🌈 ขอบสีรุ้งหมุน
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,30); title.BackgroundColor3 = Color3.fromRGB(50,52,65)
-title.Text = "🌈 ⛏️ ขวานโอมเพี้ยง 🌈"; title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.GothamBold; title.TextSize = 13; title.Parent = menu
-Instance.new("UICorner", title).CornerRadius = UDim.new(0,10)
-
-local function btn(text, y, func)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(0.9,0,0,26); b.Position = UDim2.new(0.05,0,0,y)
-    b.BackgroundColor3 = Color3.fromRGB(55,60,75); b.Text = text
-    b.TextColor3 = Color3.new(1,1,1); b.TextSize = 10; b.AutoButtonColor = false; b.Parent = menu
-    AddRainbowBorder(b, 1.5)  -- 🌈 ขอบสีรุ้งหมุนให้ทุกปุ่ม
-    b.MouseButton1Click:Connect(func)
-    return b
 end
 
-local function toggle(b, on, onText, offText)
-    b.Text = on and onText or offText
-    b.BackgroundColor3 = on and Color3.fromRGB(35,120,75) or Color3.fromRGB(55,60,75)
+local function SetNoClip(on)
+    Settings.NoClip = on
+    task.spawn(function()
+        while Settings.NoClip and Refs.Char do
+            for _, part in pairs(Refs.Char:GetChildren()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+            task.wait(0.1)
+        end
+    end)
 end
 
-local bDark = btn("1️⃣ ลบมืด: ปิด", 38, function()
-    NoDark = not NoDark; setDark(NoDark)
-    toggle(bDark, NoDark, "1️⃣ ลบมืด: เปิด", "1️⃣ ลบมืด: ปิด")
+local function SetLowGraph(on)
+    Settings.LowGraph = on
+    local RS = settings():GetService("RenderSettings")
+    if on then
+        RS.QualityLevel = 1
+        RS.ShadowMapSize = 64
+        RS.MaterialQuality = Enum.MaterialQuality.Low
+        RS.AmbientOcclusion = Enum.AmbientOcclusion.Off
+        RS.BloomEffect = Enum.BloomEffect.Off
+        RS.ColorCorrection = Enum.ColorCorrection.Off
+        Lighting.GlobalShadows = false
+        Lighting.Fog = false
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") then v.CastShadow = false end
+        end
+    else
+        RS.QualityLevel = Orig.Render.Quality
+        RS.AmbientOcclusion = Enum.AmbientOcclusion.Auto
+        RS.BloomEffect = Enum.BloomEffect.Auto
+        RS.ColorCorrection = Enum.ColorCorrection.Auto
+        Lighting.GlobalShadows = Orig.Lighting.GlobalShadows
+        Lighting.Fog = Orig.Lighting.Fog
+    end
+end
+
+-- ===== สร้างเมนู =====
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "GameMenu"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+ScreenGui.Parent = pg
+
+-- ปุ่มเปิดเมนู — มุมล่างซ้าย ชัดเจน
+local OpenBtn = Instance.new("TextButton")
+OpenBtn.Name = "OpenBtn"
+OpenBtn.Size = UDim2.new(0, 70, 0, 70)
+OpenBtn.Position = UDim2.new(0.02, 0, 0.90, -70)
+OpenBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 90)
+OpenBtn.Text = "เมนู"
+OpenBtn.TextColor3 = Color3.new(1,1,1)
+OpenBtn.Font = Enum.Font.GothamBold
+OpenBtn.TextSize = 14
+OpenBtn.BorderSizePixel = 0
+Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(0, 16)
+OpenBtn.Parent = ScreenGui
+
+-- กล่องเมนูหลัก
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 260, 0, 400)
+MainFrame.Position = UDim2.new(0.05, 0, 0.10, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+MainFrame.Visible = false
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(80,80,120)
+MainFrame.Parent = ScreenGui
+
+-- หัวเมนู
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 70)
+Title.Text = "🎮 เมนูสคริป"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 12)
+Title.Parent = MainFrame
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -10, 1, -55)
+Scroll.Position = UDim2.new(0, 5, 0, 50)
+Scroll.BackgroundTransparency = 1
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 360)
+Scroll.ScrollBarThickness = 4
+Scroll.Parent = MainFrame
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0, 8)
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Parent = Scroll
+
+-- ฟังก์ชันสร้างปุ่ม
+local function MakeButton(name, callback)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(1, 0, 0, 40)
+    Btn.BackgroundColor3 = Color3.fromRGB(55, 55, 90)
+    Btn.Text = "⚫ " .. name
+    Btn.TextColor3 = Color3.new(1,1,1)
+    Btn.Font = Enum.Font.Gotham
+    Btn.TextSize = 13
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 8)
+    Btn.Parent = Scroll
+    
+    local IsOn = false
+    Btn.MouseButton1Click:Connect(function()
+        IsOn = not IsOn
+        Btn.BackgroundColor3 = IsOn and Color3.fromRGB(35, 160, 80) or Color3.fromRGB(55, 55, 90)
+        Btn.Text = IsOn and "🟢 "..name or "⚫ "..name
+        callback(IsOn)
+    end)
+    return Btn
+end
+
+-- สร้างปุ่มเมนูทีละอัน
+MakeButton("ลดแสงมืด", SetNoDark)
+MakeButton("บิน", SetFly)
+MakeButton("ทะลุกำแพง", SetNoClip)
+MakeButton("ลดกราฟฟิก ลื่นสุด", SetLowGraph)
+
+-- ปิด-เปิดเมนู
+OpenBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    OpenBtn.Visible = false
 end)
 
-local bGfx = btn("2️⃣ กราฟฟิกสูง: ปิด", 70, function()
-    MaxGfx = not MaxGfx; setMaxGfx(MaxGfx)
-    toggle(bGfx, MaxGfx, "2️⃣ กราฟฟิกสูง: เปิด", "2️⃣ กราฟฟิกสูง: ปิด")
+-- ปิดปุ่มในเมนู
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 50, 0, 35)
+CloseBtn.Position = UDim2.new(1, -55, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+CloseBtn.Text = "ปิด"
+CloseBtn.TextColor3 = Color3.new(1,1,1)
+CloseBtn.Font = Enum.Font.Gotham
+CloseBtn.TextSize = 12
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
+CloseBtn.Parent = MainFrame
+
+CloseBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    OpenBtn.Visible = true
 end)
 
-local bJump = btn("3️⃣ กระโดด: ปิด", 102, function()
-    InfiniteJump = not InfiniteJump
-    toggle(bJump, InfiniteJump, "3️⃣ กระโดด: เปิด", "3️⃣ กระโดด: ปิด")
-end)
-
-local bGod = btn("4️⃣ อมตะ: ปิด", 134, function()
-    GodMode = not GodMode; setGod(GodMode)
-    toggle(bGod, GodMode, "4️⃣ อมตะ: เปิด", "4️⃣ อมตะ: ปิด")
-end)
-
-local bClip = btn("5️⃣ ทะลุกำแพง: ปิด", 166, function()
-    NoClipFront = not NoClipFront
-    toggle(bClip, NoClipFront, "5️⃣ ทะลุกำแพง: เปิด", "5️⃣ ทะลุกำแพง: ปิด")
-end)
-
-local bAntiKick = btn("6️⃣ ป้องกันเตะออก: ปิด", 198, function()
-    AntiKick = not AntiKick; setAntiKick(AntiKick)
-    toggle(bAntiKick, AntiKick, "6️⃣ ป้องกันเตะออก: เปิด", "6️⃣ ป้องกันเตะออก: ปิด")
-end)
-
-local bOil = btn("7️⃣ ดินน้ำมัน/ลื่น: ปิด", 230, function()
-    OilPaint = not OilPaint; setOilPaint(OilPaint)
-    toggle(bOil, OilPaint, "7️⃣ ดินน้ำมัน/ลื่น: เปิด", "7️⃣ ดินน้ำมัน/ลื่น: ปิด")
-end)
-
-local spdText = Instance.new("TextLabel")
-spdText.Size = UDim2.new(0.9,0,0,18); spdText.Position = UDim2.new(0.05,0,0,262)
-spdText.BackgroundTransparency = 1; spdText.Text = "🏃 ความเร็ว: " .. WalkSpeed
-spdText.TextColor3 = Color3.new(1,1,1); spdText.TextSize = 11; spdText.Parent = menu
-
-local spdMinus = btn("−", 284, function()
-    WalkSpeed = math.max(WalkSpeed - 5, 1)
-    spdText.Text = "🏃 ความเร็ว: " .. WalkSpeed
-    if Humanoid then Humanoid.WalkSpeed = WalkSpeed end
-end)
-spdMinus.Size = UDim2.new(0.25,0,0,24); spdMinus.Position = UDim2.new(0.05,0,0,284)
-spdMinus.BackgroundColor3 = Color3.fromRGB(70,50,90)
-
-local spdPlus = btn("+", 284, function()
-    WalkSpeed = math.min(WalkSpeed + 5, 100)
-    spdText.Text = "🏃 ความเร็ว: " .. WalkSpeed
-    if Humanoid then Humanoid.WalkSpeed = WalkSpeed end
-end)
-spdPlus.Size = UDim2.new(0.25,0,0,24); spdPlus.Position = UDim2.new(0.7,0,0,284)
-spdPlus.BackgroundColor3 = Color3.fromRGB(30,110,80)
-
-openBtn.MouseButton1Click:Connect(function()
-    menu.Visible = not menu.Visible
-    openBtn.BackgroundColor3 = menu.Visible and Color3.fromRGB(50,130,85) or Color3.fromRGB(45,45,55)
-end)
-
-print("[🌈] โหลดสำเร็จ! ขอบสีรุ้งหมุนเวียนทุกปุ่ม")
-print("[⛏️] กด ⛏️ ที่มุมจอเปิดเมนู")
+print("[✅] เมนูพร้อมใช้! กดปุ่ม 'เมนู' มุมล่างซ้าย")
