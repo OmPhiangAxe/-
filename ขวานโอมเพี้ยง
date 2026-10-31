@@ -1,226 +1,193 @@
--- เมนูมือถือ v2.0 | แก้ปัญหาเมนูไม่ขึ้น
-local Players = game:GetService("Players")
-local plr = Players.LocalPlayer
-local pg = plr:WaitForChild("PlayerGui")
+pcall(function()local old=game:GetService("CoreGui"):FindFirstChild("SP")if old then old:Destroy()end end)
+pcall(function()local old=game.Players.LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("SP")if old then old:Destroy()end end)
 
--- ลบเมนูเก่าก่อน
-if pg:FindFirstChild("GameMenu") then pg.GameMenu:Destroy() end
+local P,R,U,p=game:GetService("Players"),game:GetService("RunService"),game:GetService("UserInputService"),game.Players.LocalPlayer
+local awO=false
+local spdMult=0
+local lastPos=nil
+local baseSpd=16
+local origWS=16
 
--- ===== ตัวแปรสถานะ =====
-local Settings = {
-    NoDark = false, Fly = false, NoClip = false,
-    God = false, NoDeath = false, OneHit = false,
-    Nuke = false, ItemFind = false, LowGraph = false
-}
-local Values = {Damage=100, NukeRange=15, WalkSpeed=16, FlySpeed=35}
-local Refs = {BodyVel=nil, Humanoid=nil, HRP=nil, Char=nil, ItemMarkers={}}
-local Orig = {Lighting={}, Render={}}
+-- ==============================
+-- 🚀 Speed System
+-- ==============================
+local speedLevels = {0, 5, 10, 15, 20, 30, 40, 50}
+local speedIndex = 1
 
--- ===== บันทึกค่าเดิม =====
-Orig.Lighting = {
-    Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime,
-    GlobalShadows = Lighting.GlobalShadows, Fog = Lighting.Fog,
-    FogDensity = Lighting.FogDensity
-}
-Orig.Render = {Quality=settings():GetService("RenderSettings").QualityLevel}
+local function gp()local a,b=pcall(function()return gethui()end)if a and b then return b end return game:GetService("CoreGui")or p:WaitForChild("PlayerGui")end
+local function rp()local p2=RaycastParams.new()p2.FilterDescendantsInstances={p.Character}p2.FilterType=Enum.RaycastFilterType.Exclude p2.IgnoreWater=true return p2 end
+local function groundAt(pos)return workspace:Raycast(pos,Vector3.new(0,-8,0),rp())~=nil end
+local function grabBase()pcall(function()local c=p.Character if c then local h=c:FindFirstChildOfClass("Humanoid")if h and h.WalkSpeed>0 and h.WalkSpeed<100 then baseSpd=h.WalkSpeed origWS=baseSpd end end end)end
 
--- ===== ฟังก์ชันพื้นฐาน =====
-local function SetupChar(c)
-    if not c then return end
-    Refs.Char = c
-    Refs.Humanoid = c:WaitForChild("Humanoid")
-    Refs.HRP = c:WaitForChild("HumanoidRootPart")
-    Refs.Humanoid.WalkSpeed = Values.WalkSpeed
-    Refs.Humanoid.GravityScale = 1
-end
-SetupChar(plr.Character)
-plr.CharacterAdded:Connect(SetupChar)
+local function fS()pcall(function()
+    local c=p.Character if not c then return end
+    local h=c:FindFirstChildOfClass("Humanoid")if not h then return end
+    local r=c:FindFirstChild("HumanoidRootPart")if not r then return end
+    local curPos=r.Position
+    local antiOn=awO or spdMult>0
 
--- ===== ฟีเจอร์ต่างๆ =====
-local function SetNoDark(on)
-    Settings.NoDark = on
-    if on then
-        Lighting.Brightness = 2
-        Lighting.ClockTime = 12
-        Lighting.GlobalShadows = false
-        Lighting.Ambient = Color3.fromRGB(200,200,200)
-        Lighting.OutdoorAmbient = Color3.fromRGB(200,200,200)
-    else
-        Lighting.Brightness = Orig.Lighting.Brightness
-        Lighting.ClockTime = Orig.Lighting.ClockTime
-        Lighting.GlobalShadows = Orig.Lighting.GlobalShadows
-    end
-end
-
-local function SetFly(on)
-    Settings.Fly = on
-    if not Refs.Humanoid or not Refs.HRP then return end
-    if on then
-        Refs.Humanoid.GravityScale = 0
-        Refs.Humanoid.JumpPower = 0
-        task.spawn(function()
-            while Settings.Fly and Refs.HRP do
-                local camCF = workspace.CurrentCamera.CFrame
-                local move = Vector3.new()
-                if UIS:IsKeyDown(Enum.KeyCode.W) then move += camCF.LookVector end
-                if UIS:IsKeyDown(Enum.KeyCode.S) then move -= camCF.LookVector end
-                if UIS:IsKeyDown(Enum.KeyCode.A) then move -= camCF.RightVector end
-                if UIS:IsKeyDown(Enum.KeyCode.D) then move += camCF.RightVector end
-                if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
-                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
-                Refs.HRP.Velocity = move.Unit * Values.FlySpeed
-                task.wait(0.05)
-            end
-        end)
-    else
-        Refs.Humanoid.GravityScale = 1
-    end
-end
-
-local function SetNoClip(on)
-    Settings.NoClip = on
-    task.spawn(function()
-        while Settings.NoClip and Refs.Char do
-            for _, part in pairs(Refs.Char:GetChildren()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
-            end
-            task.wait(0.1)
+    if groundAt(curPos)then lastPos=curPos end
+    if antiOn and not groundAt(curPos)then
+        if r.Velocity.Y<-3 or h:GetState()==Enum.HumanoidStateType.Freefall then
+            if lastPos then r.CFrame=CFrame.new(lastPos)r.Velocity=Vector3.new()h.PlatformStand=false end
+            return
         end
-    end)
-end
+    end
 
-local function SetLowGraph(on)
-    Settings.LowGraph = on
-    local RS = settings():GetService("RenderSettings")
-    if on then
-        RS.QualityLevel = 1
-        RS.ShadowMapSize = 64
-        RS.MaterialQuality = Enum.MaterialQuality.Low
-        RS.AmbientOcclusion = Enum.AmbientOcclusion.Off
-        RS.BloomEffect = Enum.BloomEffect.Off
-        RS.ColorCorrection = Enum.ColorCorrection.Off
-        Lighting.GlobalShadows = false
-        Lighting.Fog = false
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("BasePart") then v.CastShadow = false end
+    if spdMult==0 then return end
+    local curSp=baseSpd*spdMult
+    h.WalkSpeed=curSp
+
+    if r and h.MoveDirection.Magnitude>0.1 then
+        local lv=h.MoveDirection
+        if antiOn then
+            local nextPos=curPos+lv*math.max(3,curSp*0.05)
+            if not groundAt(nextPos)then
+                r.Velocity=Vector3.new(0,r.Velocity.Y,0)
+                return
+            end
         end
+        r.AssemblyLinearVelocity=Vector3.new(lv.X*curSp,r.AssemblyLinearVelocity.Y,lv.Z*curSp)
+    end
+end)end
+
+local function updateSpeedBtn()
+    if spdMult==0 then
+        X2.Text = "🚀 Speed: Off"
+        X2.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
     else
-        RS.QualityLevel = Orig.Render.Quality
-        RS.AmbientOcclusion = Enum.AmbientOcclusion.Auto
-        RS.BloomEffect = Enum.BloomEffect.Auto
-        RS.ColorCorrection = Enum.ColorCorrection.Auto
-        Lighting.GlobalShadows = Orig.Lighting.GlobalShadows
-        Lighting.Fog = Orig.Lighting.Fog
+        X2.Text = "🚀 Speed: x"..spdMult
+        X2.BackgroundColor3 = Color3.fromRGB(59, 130, 246)
     end
 end
 
--- ===== สร้างเมนู =====
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GameMenu"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-ScreenGui.Parent = pg
-
--- ปุ่มเปิดเมนู — มุมล่างซ้าย ชัดเจน
-local OpenBtn = Instance.new("TextButton")
-OpenBtn.Name = "OpenBtn"
-OpenBtn.Size = UDim2.new(0, 70, 0, 70)
-OpenBtn.Position = UDim2.new(0.02, 0, 0.90, -70)
-OpenBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 90)
-OpenBtn.Text = "เมนู"
-OpenBtn.TextColor3 = Color3.new(1,1,1)
-OpenBtn.Font = Enum.Font.GothamBold
-OpenBtn.TextSize = 14
-OpenBtn.BorderSizePixel = 0
-Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(0, 16)
-OpenBtn.Parent = ScreenGui
-
--- กล่องเมนูหลัก
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 260, 0, 400)
-MainFrame.Position = UDim2.new(0.05, 0, 0.10, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-MainFrame.Visible = false
-MainFrame.Active = true
-MainFrame.Draggable = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
-Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(80,80,120)
-MainFrame.Parent = ScreenGui
-
--- หัวเมนู
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 45)
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 70)
-Title.Text = "🎮 เมนูสคริป"
-Title.TextColor3 = Color3.new(1,1,1)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 12)
-Title.Parent = MainFrame
-
-local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -10, 1, -55)
-Scroll.Position = UDim2.new(0, 5, 0, 50)
-Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 360)
-Scroll.ScrollBarThickness = 4
-Scroll.Parent = MainFrame
-
-local ListLayout = Instance.new("UIListLayout")
-ListLayout.Padding = UDim.new(0, 8)
-ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ListLayout.Parent = Scroll
-
--- ฟังก์ชันสร้างปุ่ม
-local function MakeButton(name, callback)
-    local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(1, 0, 0, 40)
-    Btn.BackgroundColor3 = Color3.fromRGB(55, 55, 90)
-    Btn.Text = "⚫ " .. name
-    Btn.TextColor3 = Color3.new(1,1,1)
-    Btn.Font = Enum.Font.Gotham
-    Btn.TextSize = 13
-    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 8)
-    Btn.Parent = Scroll
-    
-    local IsOn = false
-    Btn.MouseButton1Click:Connect(function()
-        IsOn = not IsOn
-        Btn.BackgroundColor3 = IsOn and Color3.fromRGB(35, 160, 80) or Color3.fromRGB(55, 55, 90)
-        Btn.Text = IsOn and "🟢 "..name or "⚫ "..name
-        callback(IsOn)
-    end)
-    return Btn
+local function toggleSpeed()
+    if speedIndex == 1 then speedIndex = 2 else speedIndex = 1 end
+    spdMult = speedLevels[speedIndex]
+    if spdMult > 0 then grabBase() end
+    updateSpeedBtn()
 end
 
--- สร้างปุ่มเมนูทีละอัน
-MakeButton("ลดแสงมืด", SetNoDark)
-MakeButton("บิน", SetFly)
-MakeButton("ทะลุกำแพง", SetNoClip)
-MakeButton("ลดกราฟฟิก ลื่นสุด", SetLowGraph)
+local function speedUp()
+    if speedIndex == 1 then grabBase() end
+    if speedIndex < #speedLevels then
+        speedIndex += 1
+        spdMult = speedLevels[speedIndex]
+    end
+    updateSpeedBtn()
+end
 
--- ปิด-เปิดเมนู
-OpenBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = true
-    OpenBtn.Visible = false
+local function speedDown()
+    if speedIndex > 1 then
+        speedIndex -= 1
+        spdMult = speedLevels[speedIndex]
+    end
+    updateSpeedBtn()
+end
+
+-- ==============================
+-- 🛡️ Anti-Fall
+-- ==============================
+local function updateAntiFallBtn()
+    if awO then
+        AW.Text = "🛡️ Anti-Fall: ON ✅"
+        AW.BackgroundColor3 = Color3.fromRGB(59, 130, 246)
+    else
+        AW.Text = "🛡️ Anti-Fall: Off"
+        AW.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
+    end
+end
+
+-- ==============================
+-- 🎨 UI Creation
+-- ==============================
+local G=Instance.new("ScreenGui")G.Name="SP"G.ResetOnSpawn=false G.IgnoreGuiInset=true G.ZIndexBehavior=Enum.ZIndexBehavior.Sibling G.Parent=gp()
+
+local function mkP(sz,pos,par,col)
+    local f=Instance.new("Frame")
+    f.Size=sz f.Position=pos f.BackgroundColor3=col f.Parent=par
+    f.BorderSizePixel=0
+    Instance.new("UICorner",f).CornerRadius=UDim.new(0,16)
+    local shadow=Instance.new("UIStroke")
+    shadow.Thickness=1 shadow.Color=Color3.fromRGB(255,255,255) shadow.Transparency=0.92 shadow.Parent=f
+    return f
+end
+
+local function mkB(tx,sz,pos,par,bgCol,hovCol,tCol)
+    local b=Instance.new("TextButton")
+    b.Size=sz b.Position=pos b.Text=tx b.BackgroundColor3=bgCol
+    b.TextColor3=tCol or Color3.new(1,1,1)
+    b.Font=Enum.Font.GothamBold b.TextSize=14 b.AutoLocalize=false
+    b.BorderSizePixel=0 b.ClipsDescendants=true b.Parent=par
+    Instance.new("UICorner",b).CornerRadius=UDim.new(0,10)
+    local hover=hovCol or Color3.fromRGB(70,70,90)
+    b.MouseEnter:Connect(function()b.BackgroundColor3=hover end)
+    b.MouseLeave:Connect(function()b.BackgroundColor3=bgCol end)
+    return b
+end
+
+-- Menu Button 🌩️
+local FB=Instance.new("TextButton")
+FB.Size=UDim2.fromOffset(60,60) FB.Position=UDim2.new(0,18,0,18)
+FB.BackgroundColor3=Color3.fromRGB(59, 130, 246)
+FB.Text="🌩️" FB.Font=Enum.Font.GothamBold FB.TextSize=30
+FB.BorderSizePixel=0 FB.AutoLocalize=false FB.Parent=G
+Instance.new("UICorner",FB).CornerRadius=UDim.new(1,0)
+
+local W,H=340,220
+local MN=mkP(UDim2.fromOffset(W,H),UDim2.new(0.5, -W/2, 0.5, -H/2),G,Color3.fromRGB(24,24,37))
+MN.Active=true MN.Draggable=true MN.Visible=false
+
+-- Header
+local Head=Instance.new("Frame")
+Head.Size=UDim2.new(1,0,0,48) Head.Position=UDim2.new(0,0,0,0)
+Head.BackgroundColor3=Color3.fromRGB(30,30,46) Head.Parent=MN
+Instance.new("UICorner",Head).CornerRadius=UDim.new(0,16)
+local Title=Instance.new("TextLabel")
+Title.Size=UDim2.new(1,-60,1,0) Title.Position=UDim2.new(1,0,0,0)
+Title.BackgroundTransparency=1 Title.Text="    ⚙️  Control Panel" Title.TextColor3=Color3.fromRGB(220,220,240)
+Title.Font=Enum.Font.GothamBold Title.TextSize=18 Title.TextXAlignment=Enum.TextXAlignment.Left Title.Parent=Head
+local Xb=Instance.new("TextButton")
+Xb.Size=UDim2.fromOffset(36,36) Xb.Position=UDim2.new(1,-44,0,6)
+Xb.BackgroundColor3=Color3.fromRGB(220,70,70) Xb.Text="✕" Xb.TextColor3=Color3.new(1,1,1)
+Xb.Font=Enum.Font.GothamBold Xb.TextSize=14 Xb.BorderSizePixel=0 Xb.AutoLocalize=false Xb.Parent=Head
+Instance.new("UICorner",Xb).CornerRadius=UDim.new(1,0)
+
+-- Buttons
+X2=mkB("🚀 Speed: Off",UDim2.new(1,-124,0,46),UDim2.new(0,12,0,65),MN,Color3.fromRGB(45,45,58),Color3.fromRGB(60,60,80))
+local SpUp=mkB("➕",UDim2.fromOffset(52,46),UDim2.new(1,-106,0,65),MN,Color3.fromRGB(16,185,129),Color3.fromRGB(22,163,104))
+local SpDown=mkB("➖",UDim2.fromOffset(52,46),UDim2.new(1,-52,0,65),MN,Color3.fromRGB(245,158,11),Color3.fromRGB(217,119,6))
+local AW=mkB("🛡️ Anti-Fall: Off",UDim2.new(1,-24,0,50),UDim2.new(0,12,0,126),MN,Color3.fromRGB(45,45,58),Color3.fromRGB(60,60,80))
+
+-- Info
+local KL=Instance.new("TextLabel")
+KL.Size=UDim2.new(1,-24,0,40) KL.Position=UDim2.new(0,12,1,-44)
+KL.BackgroundTransparency=1 KL.Text="🌩️ Press 🌩️ to open/close menu  |  ⌨️ [1]=Toggle Speed | [2]=Faster | [3]=Slower\n⚡ Levels: Off → x5 → x10 → x15 → x20 → x30 → x40 → x50"
+KL.TextColor3=Color3.fromRGB(140,140,160) KL.TextSize=10 KL.Font=Enum.Font.Gotham
+KL.TextYAlignment=Enum.TextYAlignment.Center KL.Parent=MN
+
+-- ==============================
+-- Button Connections
+-- ==============================
+X2.MouseButton1Click:Connect(toggleSpeed)
+SpUp.MouseButton1Click:Connect(speedUp)
+SpDown.MouseButton1Click:Connect(speedDown)
+
+AW.MouseButton1Click:Connect(function()
+    awO=not awO
+    updateAntiFallBtn()
 end)
 
--- ปิดปุ่มในเมนู
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 50, 0, 35)
-CloseBtn.Position = UDim2.new(1, -55, 0, 5)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
-CloseBtn.Text = "ปิด"
-CloseBtn.TextColor3 = Color3.new(1,1,1)
-CloseBtn.Font = Enum.Font.Gotham
-CloseBtn.TextSize = 12
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
-CloseBtn.Parent = MainFrame
+Xb.MouseButton1Click:Connect(function()MN.Visible=false end)
+FB.MouseButton1Click:Connect(function()MN.Visible=not MN.Visible end)
 
-CloseBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
-    OpenBtn.Visible = true
+-- Keyboard Shortcuts
+U.InputBegan:Connect(function(input,gp)if gp then return end
+    if input.KeyCode==Enum.KeyCode.One then toggleSpeed()
+    elseif input.KeyCode==Enum.KeyCode.Two then speedUp()
+    elseif input.KeyCode==Enum.KeyCode.Three then speedDown() end
 end)
 
-print("[✅] เมนูพร้อมใช้! กดปุ่ม 'เมนู' มุมล่างซ้าย")
+-- Auto Start
+p.CharacterAdded:Connect(function()task.wait(0.5)grabBase()lastPos=nil end)
+task.spawn(function()while task.wait(.02)do fS()end end)
